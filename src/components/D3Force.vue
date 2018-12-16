@@ -12,7 +12,7 @@
       </a>
     </sui-menu>
     <sui-segment style="height:90vh" attached="bottom">
-      <d3-network v-on:node-click="nodeClick" :net-nodes="nodes" :net-links="links" :options="options" />
+      <d3-network id="id-d3-network" v-on:node-click="nodeClick" :net-nodes="nodes" :net-links="links" :options="options" />
     </sui-segment>
   </div>
 </template>
@@ -24,7 +24,14 @@ export default {
   components: {
     D3Network
   },
-  props: ['nodes', 'links'],
+  computed: {
+    nodes () {
+      return this.$store.state.nodes
+    },
+    links () {
+      return this.$store.state.links
+    }
+  },
   data () {
     return {
       tabs: ['Query', 'Opinion'],
@@ -32,10 +39,13 @@ export default {
       options: {
         nodeSize: 50,
         canvas: false,
-        nodeLabels: true,
-        force: 20000
+        nodeLabels: true
       }
     }
+  },
+  mounted: function () {
+    var width = document.getElementById('id-d3-network').getBoundingClientRect().width
+    this.$set(this.options, 'force', width * 7)
   },
   methods: {
     isActive (name) {
@@ -45,8 +55,7 @@ export default {
       this.active = name
     },
     nodeClick (event, node) {
-      this.$emit('updateSidebar', node)
-      // this.$emit('degreeExpansion', node.id)
+      this.$store.commit('updateSidebar', node)
     }
   }
 }

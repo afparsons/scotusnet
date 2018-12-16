@@ -18,7 +18,7 @@
     </div>
     <sui-divider />
     <div class='search'>
-      <sui-input attached="top" style="width:100%" icon="search" placeholder="Search..." v-model="query" @click="queryNotFound=false" v-on:keyup.enter="searchAndDisplayGraph()"/>
+      <sui-input attached="top" style="width:100%" icon="search" placeholder="Search by full case name..." v-model="query" @click="queryNotFound=false" v-on:keyup.enter="searchAndDisplayGraph()"/>
     </div>
     <sui-divider />
 
@@ -54,9 +54,9 @@
             </tr>
           </table>
           <div id="showHideButtons" is="sui-button-group">
-            <sui-button v-on:click="emit_degreeExpansion()">Show This Case's Citations</sui-button>
+            <sui-button v-on:click="degreeExpansion()">Show This Case's Citations</sui-button>
             <sui-button-or/>
-            <sui-button v-on:click="emit_degreeContraction()">Hide This Case's Citations</sui-button>
+            <sui-button v-on:click="degreeContraction()">Hide This Case's Citations</sui-button>
           </div>
           <sui-divider />
           <sui-card-content style="text-align:left">
@@ -110,7 +110,7 @@
           <sui-menu :widths="3">
             <sui-menu-item><a>{{usrCitation}}</a></sui-menu-item>
             <sui-menu-item><a>50 S. Ct. 273 </a></sui-menu-item>
-            <sui-menu-item>Lexis</sui-menu-item>
+            <sui-menu-item>{{count}}</sui-menu-item>
           </sui-menu>
         <!-- <sui-card-content> -->
           <!-- <sui-message positive dismissable>
@@ -172,6 +172,7 @@
         <tr>
           <th>
             <sui-dropdown placeholder="Date Format" selection/>
+            <sui-dropdown placeholder="Degree" selection :options="dropdownDegreeOptions" v-model="degree"/>
           </th>
           <th>
             <sui-checkbox class="checkbox-options" label="Case Name"/>
@@ -185,28 +186,58 @@
       </table>
     </div>
     <sui-divider />
+    <h4 is="sui-header">Testing (temporary shortcuts)</h4>
+    <div class='testing'>
+      <table>
+        <tr>
+          <th>
+            <sui-button primary v-on:click="test('Thompson v. Fairbanks')">Thompson v. Fairbanks</sui-button>
+          </th>
+          <th>
+            <sui-button secondary v-on:click="test('Hauselt v. Harrison')">Hauselt v. Harrison</sui-button>
+          </th>
+          <th>
+            <sui-button primary v-on:click="test('Perrin v. United States')">Perrin v. United States</sui-button>
+          </th>
+        </tr>
+      </table>
+    </div>
   </div>
 </template>
 
 <script>
 export default {
   name: 'Sidebar',
-  // see if there is a better solution to this mega-pass!
-  props: [
-    //   'query',
-    //   'queryNotFound',
-    'currentQueryCaseName',
-    'selectedCaseName',
-    'usrCitation',
-    //   'neo4jID',
-    'courtListenerID'
-  ],
+  computed: {
+    currentQueryCaseName () {
+      return this.$store.state.currentQueryCaseName
+    },
+    selectedCaseName () {
+      return this.$store.state.selectedCaseName
+    },
+    usrCitation () {
+      return this.$store.state.usrCitation
+    },
+    courtListenerID () {
+      return this.$store.state.courtListenerID
+    },
+    count () {
+      return this.$store.state.count
+    }
+  },
   data () {
     return {
       query: '',
       queryNotFound: false,
       active: 'Majority',
       items: ['Majority', 'Concurring', 'Dissenting'],
+      degree: 1,
+      dropdownDegreeOptions: [
+        { text: '1', value: 1 },
+        { text: '2', value: 2 },
+        { text: '3', value: 3 },
+        { text: 'n', value: '' }
+      ],
 
       // Neo4j
       protocol: 'bolt',
@@ -216,58 +247,67 @@ export default {
       password: 'RedWatermelon!vue',
       // fix encryption!
       encrypted: false
-
-      // Node info
-      // currentQueryCaseName: '',
-      // usrCitation: ''
     }
   },
   methods: {
+    test (q) {
+      this.query = q
+      this.searchAndDisplayGraph()
+    },
     isActive (name) {
       return this.active === name
     },
     select (name) {
       this.active = name
     },
-    cleanQuery (query) {
-      var cleanedQuery = query.trim()
+    cleanQuery (uncleanQuery) {
+      var cleanedQuery = uncleanQuery.trim()
       return cleanedQuery
     },
     buildNodesArray (records) {
       var nodesArray = []
-      nodesArray.push({
-        id: records[0]._fields[0].properties.id,
-        name: records[0]._fields[0].properties.name,
-        _color: '#FFD700'
-      })
-      for (var i = 0, len = records.length; i < len; i++) {
+      if (records[0] !== undefined) {
         nodesArray.push({
-          id: records[i]._fields[1].properties.id,
-          name: records[i]._fields[1].properties.name,
-          usrCitation: records[i]._fields[1].properties.usr_citation
+          id: records[0]._fields[0].properties.id,
+          name: records[0]._fields[0].properties.name,
+          usrCitation: records[0]._fields[0].properties.usr_citation,
+          _color: '#FFD700'
         })
+        for (var i = 0, len = records.length; i < len; i++) {
+          nodesArray.push({
+            id: records[i]._fields[1].properties.id,
+            name: records[i]._fields[1].properties.name,
+            usrCitation: records[i]._fields[1].properties.usr_citation
+          })
+        }
+      } else {
+        console.log('No records whence to build the node array')
       }
       return nodesArray
     },
     buildLinksArray (records) {
       var linksArray = []
-      for (var i = 0, len = records.length; i < len; i++) {
-        linksArray.push({
-          sid: records[i]._fields[0].properties.id,
-          tid: records[i]._fields[1].properties.id
-        })
+      if (records[0] !== undefined) {
+        for (var i = 0, len = records.length; i < len; i++) {
+          linksArray.push({
+            sid: records[i]._fields[0].properties.id,
+            tid: records[i]._fields[1].properties.id
+          })
+        }
+      } else {
+        console.log('No records whence to build the links array')
       }
       return linksArray
     },
     connect () {
       var r = this.$neo4j.connect(this.protocol, this.host, this.port, this.username, this.password, this.encrypted)
-      console.log(r)
+      // console.log(r)
       return r
     },
     driver () {
       // Get a driver instance
       var r = this.$neo4j.getDriver()
-      console.log(r)
+      // console.log(r)
       return r
     },
     getNodePropertiesByID (id) {
@@ -281,7 +321,7 @@ export default {
             courtListenerID: id,
             usrCitation: res.records[0]._fields[0].properties.usr_citation
           }
-          console.log(obj)
+          // console.log(obj)
           return obj
         })
         .then(() => {
@@ -292,32 +332,83 @@ export default {
       // Get a session from the driver
       const session = this.$neo4j.getSession()
       this.query = this.cleanQuery(this.query)
-      var cypher = 'MATCH (n {name:"' + this.query + '"})-[*]-(connected) RETURN n, connected'
+      var d = this.degree
+      var cypher = 'MATCH (n {name:"' + this.query + '"})-[*' + d + ']-(connected) RETURN n, connected'
       session.run(cypher)
         .then(res => {
           if (res.records[0] === undefined) {
             this.queryNotFound = true
           }
-          this.$emit('graph', {
+          this.$store.commit('updateGraph', {
             nodes: this.buildNodesArray(res.records),
             links: this.buildLinksArray(res.records),
             name: res.records[0]._fields[0].properties.name,
             courtListenerID: res.records[0]._fields[0].properties.id,
             usrCitation: res.records[0]._fields[0].properties.usr_citation
           })
-          // this.currentQueryCaseName = res.records[0]._fields[0].properties.name
-          // this.selectedCaseName = res.records[0]._fields[0].properties.name
-          // this.usrCitation = res.records[0]._fields[0].properties.usr_citation
         })
         .then(() => {
           session.close()
         })
     },
-    emit_degreeExpansion () {
-      this.$emit('degreeExpansion', this.courtListenerID)
+    degreeExpansion () {
+      const session = this.$neo4j.getSession()
+      var cypher = 'MATCH (n {name:"' + this.$store.state.selectedCaseName + '"})-[*1]-(connected) RETURN n, connected'
+      session.run(cypher)
+        .then(res => {
+          var expandedNodes = []
+          var expandedLinks = []
+          var nodeNameListState = []
+          var linkListState = []
+          var expandedNodesMaybeDuplicates = this.buildNodesArray(res.records)
+          var expandedLinksMaybeDuplicates = this.buildLinksArray(res.records)
+          this.$store.state.nodes.forEach((stateNode) => {
+            nodeNameListState.push(stateNode.name)
+          })
+          this.$store.state.links.forEach((stateLink) => {
+            linkListState.push(stateLink)
+          })
+          expandedNodesMaybeDuplicates.forEach((n) => {
+            if (!nodeNameListState.includes(n.name)) {
+              expandedNodes.push(n)
+            }
+          })
+          expandedLinksMaybeDuplicates.forEach((l) => {
+            if (!linkListState.includes(l)) {
+              expandedLinks.push(l)
+            }
+          })
+          this.$store.commit('updateNodesArray', expandedNodes)
+          this.$store.commit('updateLinksArray', expandedLinks)
+        })
+        .then(() => {
+          session.close()
+        })
     },
-    emit_degreeContraction () {
-      this.$emit('degreeContraction', this.courtListenerID)
+    async degreeContraction () {
+      const session = this.$neo4j.getSession()
+      var cypher = 'MATCH (n {name:"' + this.$store.state.selectedCaseName + '"})-[*1]-(connected) RETURN n, connected'
+      var removalList = []
+      let res = await session.run(cypher)
+      var shortestPathSelectedToCurrentQuery = await this.getShortestPath(this.$store.state.courtListenerID, this.$store.state.currentQueryCaseID)
+      // for (var i = 0, len = res.records.length; i < len; i++) {
+      for (const r of res.records) {
+        // TODO fix/handle promise rejections...
+        if (r._fields[1].properties.id !== this.$store.state.currentQueryCaseID) {
+          var extShortestPath = await this.getShortestPath(r._fields[1].properties.id, this.$store.state.currentQueryCaseID)
+          if (shortestPathSelectedToCurrentQuery < extShortestPath) {
+            removalList.push(r._fields[1].properties.id)
+          }
+        }
+      }
+      this.$store.commit('contractNodesArray', removalList)
+      session.close()
+    },
+    async getShortestPath (aID, bID) {
+      var shortestPath = 'MATCH (a),(b), p = shortestPath((a)-[*..15]-(b)) WHERE a.id = "' + aID + '" AND b.id = "' + bID + '" RETURN p'
+      const session = this.$neo4j.getSession()
+      let res = await session.run(shortestPath)
+      return res.records[0]._fields[0].length
     },
     thirdPartySearch (site) {
       switch (site) {
